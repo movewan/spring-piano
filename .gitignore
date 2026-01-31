@@ -38,6 +38,7 @@ yarn-error.log*
 # supabase
 supabase/.branches
 supabase/.temp
+.supabase-credentials
 
 # vercel
 .vercel
