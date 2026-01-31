@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import AdminLayout from '@/components/admin/AdminLayout'
 import Header from '@/components/admin/Header'
+import SalesCard from '@/components/admin/SalesCard'
 import { GlassCard } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 
@@ -207,6 +208,11 @@ export default function DashboardPage() {
               </GlassCard>
             </motion.div>
           ))}
+        </div>
+
+        {/* Sales Summary */}
+        <div className="mb-8">
+          <SalesCard />
         </div>
 
         {/* Recent Attendance */}

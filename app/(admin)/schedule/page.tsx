@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import AdminLayout from '@/components/admin/AdminLayout'
 import Header from '@/components/admin/Header'
 import { GlassCard, Button, Modal, Select } from '@/components/ui'
+import { getWeekDays, formatDateKorean, addWeeks, isSameDay } from '@/lib/utils/date'
 
 interface Teacher {
   id: string
@@ -26,9 +27,18 @@ interface Student {
   name: string
 }
 
+// 선생님별 색상 정의
+const TEACHER_COLORS: Record<string, string> = {
+  '보임쌤': '#7BC4C4',  // 민트
+  '김쌤': '#FF7EB3',    // 핑크
+  '이쌤': '#FFB347',    // 오렌지
+}
+
 const dayNames = ['일', '월', '화', '수', '목', '금', '토']
-const timeSlots = Array.from({ length: 37 }, (_, i) => {
-  const hour = Math.floor(i / 6) + 13 // 13:00 시작
+
+// 10:00 ~ 19:00 (10분 단위, 총 54슬롯)
+const timeSlots = Array.from({ length: 55 }, (_, i) => {
+  const hour = Math.floor(i / 6) + 10 // 10:00 시작
   const minute = (i % 6) * 10 // 10분 단위
   return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
 })
@@ -37,6 +47,8 @@ export default function SchedulePage() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedDay, setSelectedDay] = useState(new Date().getDay() || 1) // 오늘 요일
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
+  const [currentWeek, setCurrentWeek] = useState(new Date())
   const [loading, setLoading] = useState(true)
 
   // 모달 상태
@@ -45,29 +57,41 @@ export default function SchedulePage() {
   const [newSchedule, setNewSchedule] = useState({
     student_id: '',
     teacher_id: '',
-    start_time: '15:00',
-    end_time: '15:30',
+    start_time: '14:00',
+    end_time: '14:30',
   })
+
+  const weekDays = getWeekDays(currentWeek)
+  const today = new Date()
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
+      // 주간 뷰일 때는 모든 요일의 스케줄을 가져옴
+      const dayParam = viewMode === 'week' ? '' : `day=${selectedDay}`
       const [teachersRes, schedulesRes] = await Promise.all([
         fetch('/api/teachers'),
-        fetch(`/api/schedules?day=${selectedDay}`),
+        fetch(`/api/schedules?${dayParam}`),
       ])
 
       const teachersData = await teachersRes.json()
       const schedulesData = await schedulesRes.json()
 
-      if (teachersData.success) setTeachers(teachersData.data.teachers)
+      if (teachersData.success) {
+        // 선생님 색상 적용
+        const teachersWithColors = teachersData.data.teachers.map((t: Teacher) => ({
+          ...t,
+          color: TEACHER_COLORS[t.name] || t.color || '#7BC4C4'
+        }))
+        setTeachers(teachersWithColors)
+      }
       if (schedulesData.success) setSchedules(schedulesData.data.schedules)
     } catch (error) {
       console.error('Failed to fetch data:', error)
     } finally {
       setLoading(false)
     }
-  }, [selectedDay])
+  }, [selectedDay, viewMode])
 
   useEffect(() => {
     fetchData()
@@ -108,8 +132,8 @@ export default function SchedulePage() {
         setNewSchedule({
           student_id: '',
           teacher_id: '',
-          start_time: '15:00',
-          end_time: '15:30',
+          start_time: '14:00',
+          end_time: '14:30',
         })
         fetchData()
       } else {
@@ -135,12 +159,13 @@ export default function SchedulePage() {
     }
   }
 
-  const getScheduleForSlot = (teacherId: string, time: string) => {
+  const getScheduleForSlot = (teacherId: string, time: string, dayOfWeek?: number) => {
     return schedules.find(
       (s) =>
         s.teacher.id === teacherId &&
         s.start_time <= time &&
-        s.end_time > time
+        s.end_time > time &&
+        (dayOfWeek === undefined || s.day_of_week === dayOfWeek)
     )
   }
 
@@ -152,31 +177,100 @@ export default function SchedulePage() {
     return (endMinutes - startMinutes) / 10 // 10분 단위로 높이 계산
   }
 
+  const getSchedulesForDay = (dayOfWeek: number) => {
+    return schedules.filter((s) => s.day_of_week === dayOfWeek)
+  }
+
   return (
     <AdminLayout>
       <Header
         title="스케줄 관리"
-        subtitle={`${dayNames[selectedDay]}요일 시간표`}
+        subtitle={viewMode === 'week'
+          ? `${formatDateKorean(weekDays[0])} ~ ${formatDateKorean(weekDays[6])}`
+          : `${dayNames[selectedDay]}요일 시간표`
+        }
       />
 
       <div className="flex-1 overflow-y-auto p-8">
-        {/* Day Selector */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex gap-2">
-            {dayNames.slice(1).concat(dayNames[0]).map((day, i) => {
-              const dayIndex = i === 6 ? 0 : i + 1
-              return (
+        {/* View Mode Toggle & Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            {/* 뷰 모드 토글 */}
+            <div className="flex rounded-xl bg-gray-100 p-1">
+              <button
+                onClick={() => setViewMode('day')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'day'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                일간
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'week'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                주간
+              </button>
+            </div>
+
+            {/* 주간 뷰: 주 이동 */}
+            {viewMode === 'week' && (
+              <div className="flex items-center gap-2">
                 <Button
-                  key={day}
-                  variant={selectedDay === dayIndex ? 'primary' : 'outline'}
+                  variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedDay(dayIndex)}
+                  onClick={() => setCurrentWeek(addWeeks(currentWeek, -1))}
                 >
-                  {day}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                 </Button>
-              )
-            })}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentWeek(new Date())}
+                >
+                  오늘
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Button>
+              </div>
+            )}
+
+            {/* 일간 뷰: 요일 선택 */}
+            {viewMode === 'day' && (
+              <div className="flex gap-1">
+                {dayNames.slice(1).concat(dayNames[0]).map((day, i) => {
+                  const dayIndex = i === 6 ? 0 : i + 1
+                  return (
+                    <Button
+                      key={day}
+                      variant={selectedDay === dayIndex ? 'primary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setSelectedDay(dayIndex)}
+                      className="min-w-[40px]"
+                    >
+                      {day}
+                    </Button>
+                  )
+                })}
+              </div>
+            )}
           </div>
+
           <Button variant="primary" onClick={openAddModal}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -185,11 +279,25 @@ export default function SchedulePage() {
           </Button>
         </div>
 
+        {/* 선생님 범례 */}
+        <div className="flex gap-4 mb-4">
+          {teachers.map((teacher) => (
+            <div key={teacher.id} className="flex items-center gap-2">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: teacher.color }}
+              />
+              <span className="text-sm text-gray-600">{teacher.name}</span>
+            </div>
+          ))}
+        </div>
+
         {/* Schedule Grid */}
         <GlassCard className="overflow-x-auto">
           {loading ? (
             <div className="p-8 text-center text-gray-500">로딩 중...</div>
-          ) : (
+          ) : viewMode === 'day' ? (
+            /* 일간 뷰 */
             <div className="min-w-[600px]">
               {/* Header */}
               <div className="grid grid-cols-[80px_repeat(3,1fr)] border-b border-gray-200">
@@ -217,7 +325,7 @@ export default function SchedulePage() {
                       {index % 3 === 0 ? time : ''}
                     </div>
                     {teachers.map((teacher) => {
-                      const schedule = getScheduleForSlot(teacher.id, time)
+                      const schedule = getScheduleForSlot(teacher.id, time, selectedDay)
                       const isStart = schedule && schedule.start_time === time
 
                       if (isStart) {
@@ -250,6 +358,81 @@ export default function SchedulePage() {
                           key={teacher.id}
                           className={`${schedule ? '' : 'hover:bg-gray-50'}`}
                         />
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* 주간 뷰 */
+            <div className="min-w-[900px]">
+              {/* Header: 요일 */}
+              <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-200">
+                <div className="p-2 text-center text-sm font-medium text-gray-500">시간</div>
+                {weekDays.map((day, i) => {
+                  const dayOfWeek = day.getDay()
+                  const isToday = isSameDay(day, today)
+                  return (
+                    <div
+                      key={i}
+                      className={`p-2 text-center ${isToday ? 'bg-primary/10' : ''}`}
+                    >
+                      <p className={`text-sm font-medium ${isToday ? 'text-primary' : 'text-gray-900'}`}>
+                        {dayNames[dayOfWeek]}
+                      </p>
+                      <p className={`text-xs ${isToday ? 'text-primary' : 'text-gray-400'}`}>
+                        {day.getDate()}일
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Time Slots */}
+              <div className="relative">
+                {timeSlots.filter((_, i) => i % 3 === 0).map((time) => (
+                  <div
+                    key={time}
+                    className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-100"
+                    style={{ height: '72px' }}
+                  >
+                    <div className="px-2 text-xs text-gray-400 flex items-start pt-1">
+                      {time}
+                    </div>
+                    {weekDays.map((day, dayIndex) => {
+                      const dayOfWeek = day.getDay()
+                      const daySchedules = getSchedulesForDay(dayOfWeek).filter(
+                        (s) => s.start_time >= time && s.start_time < timeSlots[timeSlots.indexOf(time) + 3]
+                      )
+                      const isToday = isSameDay(day, today)
+
+                      return (
+                        <div
+                          key={dayIndex}
+                          className={`relative border-l border-gray-100 p-1 ${isToday ? 'bg-primary/5' : ''}`}
+                        >
+                          {daySchedules.map((schedule) => (
+                            <motion.div
+                              key={schedule.id}
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="mb-1 rounded p-1 cursor-pointer text-xs"
+                              style={{
+                                backgroundColor: `${schedule.teacher.color}30`,
+                                borderLeft: `2px solid ${schedule.teacher.color}`,
+                              }}
+                              onClick={() => handleDeleteSchedule(schedule.id)}
+                            >
+                              <p className="font-medium text-gray-900 truncate">
+                                {schedule.student.name}
+                              </p>
+                              <p className="text-gray-500">
+                                {schedule.start_time.slice(0, 5)}
+                              </p>
+                            </motion.div>
+                          ))}
+                        </div>
                       )
                     })}
                   </div>

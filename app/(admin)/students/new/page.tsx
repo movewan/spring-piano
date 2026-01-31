@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import AdminLayout from '@/components/admin/AdminLayout'
 import Header from '@/components/admin/Header'
-import { GlassCard, Button, Input, Select } from '@/components/ui'
+import { GlassCard, Button, Input, PhoneInput, Select, SchoolAutocomplete, GradeSelect } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
+import { SchoolType } from '@/lib/constants/schools'
 
 interface Product {
   id: string
@@ -23,6 +24,7 @@ export default function NewStudentPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const [schoolType, setSchoolType] = useState<SchoolType>('etc')
   const [formData, setFormData] = useState({
     // 기본 정보
     name: '',
@@ -41,6 +43,11 @@ export default function NewStudentPage() {
     // 동의
     consent_signed: false,
   })
+
+  const handleSchoolChange = (school: string, type: SchoolType) => {
+    setFormData((prev) => ({ ...prev, school, grade: '' }))
+    setSchoolType(type)
+  }
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -230,11 +237,12 @@ export default function NewStudentPage() {
                       onChange={(e) => handleInputChange('name', e.target.value)}
                       placeholder="홍길동"
                     />
-                    <Input
+                    <PhoneInput
                       label="연락처 *"
                       value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      onChange={(value) => handleInputChange('phone', value)}
                       placeholder="010-1234-5678"
+                      showValidation
                     />
                     <Input
                       label="생년월일"
@@ -242,31 +250,17 @@ export default function NewStudentPage() {
                       value={formData.birth_date}
                       onChange={(e) => handleInputChange('birth_date', e.target.value)}
                     />
-                    <Input
+                    <SchoolAutocomplete
                       label="학교"
                       value={formData.school}
-                      onChange={(e) => handleInputChange('school', e.target.value)}
-                      placeholder="OO초등학교"
+                      onChange={handleSchoolChange}
+                      placeholder="학교명을 입력하세요"
                     />
-                    <Select
+                    <GradeSelect
                       label="학년"
                       value={formData.grade}
-                      onChange={(e) => handleInputChange('grade', e.target.value)}
-                      options={[
-                        { value: '1', label: '1학년' },
-                        { value: '2', label: '2학년' },
-                        { value: '3', label: '3학년' },
-                        { value: '4', label: '4학년' },
-                        { value: '5', label: '5학년' },
-                        { value: '6', label: '6학년' },
-                        { value: '7', label: '중1' },
-                        { value: '8', label: '중2' },
-                        { value: '9', label: '중3' },
-                        { value: '10', label: '고1' },
-                        { value: '11', label: '고2' },
-                        { value: '12', label: '고3' },
-                      ]}
-                      placeholder="학년 선택"
+                      onChange={(value) => handleInputChange('grade', value)}
+                      schoolType={schoolType}
                     />
                   </div>
                 </motion.div>
@@ -289,11 +283,12 @@ export default function NewStudentPage() {
                       onChange={(e) => handleInputChange('parent_name', e.target.value)}
                       placeholder="홍부모"
                     />
-                    <Input
+                    <PhoneInput
                       label="보호자 연락처"
                       value={formData.parent_phone}
-                      onChange={(e) => handleInputChange('parent_phone', e.target.value)}
+                      onChange={(value) => handleInputChange('parent_phone', value)}
                       placeholder="010-9876-5432"
+                      showValidation
                     />
                     <Input
                       label="보호자 생년월일"

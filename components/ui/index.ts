@@ -1,5 +1,8 @@
 export { default as Button } from './Button'
 export { default as Input } from './Input'
+export { default as PhoneInput } from './PhoneInput'
 export { default as Select } from './Select'
+export { default as SchoolAutocomplete } from './SchoolAutocomplete'
+export { default as GradeSelect } from './GradeSelect'
 export { default as GlassCard } from './GlassCard'
 export { default as Modal } from './Modal'
