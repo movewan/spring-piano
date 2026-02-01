@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const search = searchParams.get('search') || ''
     const isActive = searchParams.get('is_active')
+    const productId = searchParams.get('product_id')
 
     const offset = (page - 1) * limit
 
@@ -45,6 +46,10 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       query = query.ilike('name', `%${search}%`)
+    }
+
+    if (productId) {
+      query = query.eq('product_id', productId)
     }
 
     const { data: students, error, count } = await query

@@ -142,3 +142,65 @@ export interface KioskStudent {
   name: string
   product_name: string | null
 }
+
+// 관리자
+export interface Admin {
+  id: string
+  email: string
+  name: string
+  encrypted_phone: string | null
+  role: 'owner' | 'manager' | 'staff'
+  is_active: boolean
+  created_at: string
+}
+
+// 수동 매출
+export interface Revenue {
+  id: string
+  date: string
+  description: string
+  amount: number
+  category: 'lesson' | 'material' | 'event' | 'other'
+  notes: string | null
+  created_at: string
+}
+
+// 지출
+export interface Expense {
+  id: string
+  date: string
+  description: string
+  amount: number
+  category: 'rent' | 'salary' | 'utilities' | 'operations' | 'materials' | 'other'
+  is_fixed: boolean
+  is_recurring: boolean
+  recurring_day: number | null
+  recurring_until: string | null
+  notes: string | null
+  created_at: string
+}
+
+// 주간 스케줄 스냅샷
+export interface WeeklyScheduleSnapshot {
+  id: string
+  week_start: string
+  week_end: string
+  status: 'draft' | 'confirmed'
+  confirmed_at: string | null
+  created_at: string
+}
+
+// 주간 스케줄 상세
+export interface WeeklyScheduleDetail {
+  id: string
+  snapshot_id: string
+  student_id: string
+  teacher_id: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+  slot_number: number
+  attendance_status: 'scheduled' | 'attended' | 'absent' | 'cancelled'
+  notes: string | null
+  created_at: string
+}
