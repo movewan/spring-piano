@@ -1,8 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GlassCard, Button } from '@/components/ui'
+
+const MUSIC_QUOTES = [
+  { quote: "음악은 영혼의 언어이다.", author: "베토벤" },
+  { quote: "음악이 없다면 인생은 실수일 것이다.", author: "베토벤" },
+  { quote: "단순함은 궁극의 정교함이다.", author: "쇼팽" },
+  { quote: "피아노 앞에 앉으면 세상에서 가장 행복한 사람이 됩니다.", author: "쇼팽" },
+  { quote: "음악은 어떤 지혜나 철학보다 높은 계시이다.", author: "베토벤" },
+  { quote: "마음에서 우러나온 음악은 다시 마음으로 향한다.", author: "베토벤" },
+  { quote: "음악은 사랑의 음식이다.", author: "모차르트" },
+  { quote: "멜로디는 음악의 본질이다.", author: "모차르트" },
+  { quote: "음악은 말로 표현할 수 없는 것을 표현한다.", author: "슈만" },
+  { quote: "음악을 사랑하지 않는 사람은 인간이라 할 수 없다.", author: "브람스" },
+]
 
 interface Student {
   id: string
@@ -19,6 +32,10 @@ export default function KioskPage() {
   const [checkedInStudent, setCheckedInStudent] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const randomQuote = useMemo(() => {
+    return MUSIC_QUOTES[Math.floor(Math.random() * MUSIC_QUOTES.length)]
+  }, [])
 
   const handleDigitPress = (digit: string) => {
     if (digits.length < 4) {
@@ -120,9 +137,9 @@ export default function KioskPage() {
           className="text-center mb-8"
         >
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            <span className="text-primary">이화피아노</span>의봄
+            <span className="text-primary">이화피아노의봄</span>음악학원
           </h1>
-          <p className="text-gray-600">출석 체크</p>
+          <p className="text-gray-600">오늘도 즐거운 음악시간 🎵</p>
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -135,7 +152,7 @@ export default function KioskPage() {
               exit={{ opacity: 0, scale: 0.95 }}
             >
               <GlassCard className="p-8">
-                <p className="text-center text-gray-600 mb-6">전화번호 뒷 4자리를 입력하세요</p>
+                <p className="text-center text-gray-600 mb-6">부모님 전화번호 뒷 4자리를 입력하세요</p>
 
                 {/* Display */}
                 <div className="flex justify-center gap-3 mb-8">
@@ -190,7 +207,7 @@ export default function KioskPage() {
                   loading={loading}
                   disabled={digits.length !== 4}
                 >
-                  출석하기
+                  즐거운 피아노 수업!
                 </Button>
               </GlassCard>
             </motion.div>
@@ -303,7 +320,7 @@ export default function KioskPage() {
           transition={{ delay: 0.5 }}
           className="text-center text-sm text-gray-400 mt-8"
         >
-          문의: 원장님께 연락하세요
+          "{randomQuote.quote}" - {randomQuote.author}
         </motion.p>
       </div>
     </main>

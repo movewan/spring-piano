@@ -56,8 +56,9 @@ export default function ParentLoginPage() {
           router.refresh()
         }
       } else {
-        if (res.status === 404) {
-          // 등록된 학부모 없음 - 이름/생년월일로 확인 필요
+        // 최초 로그인 또는 등록되지 않은 경우 - 이름/생년월일로 확인 필요
+        if (res.status === 404 ||
+            (res.status === 400 && data.error?.includes('최초 로그인'))) {
           setStep('verify')
         } else {
           setError(data.error || '로그인에 실패했습니다')
