@@ -11,6 +11,7 @@ interface Child {
   name: string
   school: string | null
   grade: number | null
+  video_folder_url: string | null
   product: { name: string } | null
   schedules: Array<{
     day_of_week: number
@@ -125,6 +126,32 @@ export default function ParentDashboardPage() {
                           </span>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Video Folder Link */}
+                  {child.video_folder_url && (
+                    <div className="mb-4">
+                      <a
+                        href={child.video_folder_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border border-red-100 hover:shadow-md transition-shadow"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">연주 영상 보기</p>
+                          <p className="text-xs text-gray-500">Google Drive 폴더</p>
+                        </div>
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
                     </div>
                   )}
 

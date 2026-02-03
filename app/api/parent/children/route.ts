@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
           birth_date,
           school,
           grade,
+          video_folder_url,
           product:products(id, name),
           schedules(
             day_of_week,
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
         birth_date: string | null
         school: string | null
         grade: number | null
+        video_folder_url: string | null
         product: { id: string; name: string } | null
         schedules: Array<{
           day_of_week: number
@@ -72,6 +74,7 @@ export async function GET(request: NextRequest) {
         birth_date: student.birth_date,
         school: student.school,
         grade: student.grade,
+        video_folder_url: student.video_folder_url,
         product: student.product,
         schedules: student.schedules,
       }

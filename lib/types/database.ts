@@ -38,6 +38,8 @@ export interface Student {
   is_active: boolean
   consent_signed: boolean
   consent_date: string | null
+  video_folder_url: string | null
+  notion_page_id: string | null
   created_at: string
   updated_at: string
 }
