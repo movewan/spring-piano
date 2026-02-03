@@ -46,3 +46,7 @@ supabase/.temp
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# migration data (contains personal info)
+scripts/data/*.json
+!scripts/data/sample-*.json
