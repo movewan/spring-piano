@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const studentId = searchParams.get('student_id')
+    const limit = searchParams.get('limit')
 
     const adminClient = createAdminClient()
 
@@ -68,7 +69,15 @@ export async function GET(request: NextRequest) {
       query = query.in('student_id', studentIds)
     }
 
-    const { data: feedback, error } = await query.order('month_year', { ascending: false })
+    // Apply ordering
+    query = query.order('month_year', { ascending: false })
+
+    // Apply limit if specified
+    if (limit) {
+      query = query.limit(parseInt(limit, 10))
+    }
+
+    const { data: feedback, error } = await query
 
     if (error) {
       console.error('Feedback fetch error:', error)

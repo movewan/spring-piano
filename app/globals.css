@@ -12,6 +12,12 @@
   --color-glass: rgba(255, 255, 255, 0.3);
   --color-glass-border: rgba(255, 255, 255, 0.2);
 
+  /* Extended colors for feedback */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-info: #3B82F6;
+  --color-accent-video: #FF6B6B;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 

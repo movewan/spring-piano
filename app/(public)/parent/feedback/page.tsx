@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { GlassCard, Button, Modal } from '@/components/ui'
+import { GlassCard, Button, Modal, TimelineItem, SectionHeader } from '@/components/ui'
 
 interface Feedback {
   id: string
@@ -14,6 +14,13 @@ interface Feedback {
   teacher: { name: string }
   student: { name: string }
   created_at: string
+}
+
+interface FeedbackGroup {
+  month: string
+  year: string
+  label: string
+  items: Feedback[]
 }
 
 function FeedbackContent() {
@@ -54,6 +61,35 @@ function FeedbackContent() {
     return `${year}년 ${parseInt(month)}월`
   }
 
+  // Group feedback by month
+  const groupedFeedback = useMemo(() => {
+    const groups: FeedbackGroup[] = []
+    const groupMap = new Map<string, Feedback[]>()
+
+    feedback.forEach(fb => {
+      const key = fb.month_year
+      if (!groupMap.has(key)) {
+        groupMap.set(key, [])
+      }
+      groupMap.get(key)!.push(fb)
+    })
+
+    // Sort by date (newest first)
+    const sortedKeys = Array.from(groupMap.keys()).sort((a, b) => b.localeCompare(a))
+
+    sortedKeys.forEach(key => {
+      const [year, month] = key.split('-')
+      groups.push({
+        month: month,
+        year: year,
+        label: `${year}년 ${parseInt(month)}월`,
+        items: groupMap.get(key)!
+      })
+    })
+
+    return groups
+  }, [feedback])
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/5 p-4 pb-24">
       <div className="max-w-lg mx-auto">
@@ -63,9 +99,16 @@ function FeedbackContent() {
           <p className="text-gray-500">선생님의 수업 피드백을 확인하세요</p>
         </div>
 
-        {/* Feedback List */}
+        {/* Feedback Timeline */}
         {loading ? (
-          <div className="text-center py-12 text-gray-500">로딩 중...</div>
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-24 mb-4" />
+                <div className="h-32 bg-gray-100 rounded-xl" />
+              </div>
+            ))}
+          </div>
         ) : feedback.length === 0 ? (
           <GlassCard className="p-8 text-center">
             <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,42 +120,38 @@ function FeedbackContent() {
             </p>
           </GlassCard>
         ) : (
-          <div className="space-y-4">
-            {feedback.map((fb, index) => (
+          <div className="space-y-8">
+            {groupedFeedback.map((group, groupIndex) => (
               <motion.div
-                key={fb.id}
+                key={group.label}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ delay: groupIndex * 0.1 }}
               >
-                <GlassCard
-                  className="p-5 cursor-pointer"
-                  hover
-                  onClick={() => setSelectedFeedback(fb)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-bold text-gray-900">
-                        {formatMonthYear(fb.month_year)}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {fb.student.name} · {fb.teacher.name} 선생님
-                      </p>
-                    </div>
-                    {fb.video_url && (
-                      <span className="px-2 py-1 bg-secondary/10 text-secondary rounded-full text-xs">
-                        영상
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-600 text-sm line-clamp-2">{fb.content}</p>
-                  <Button variant="ghost" size="sm" className="mt-3">
-                    자세히 보기
-                    <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Button>
-                </GlassCard>
+                {/* Month Header */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent to-gray-200" />
+                  <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span className="text-2xl">📅</span>
+                    {group.label}
+                  </h2>
+                  <div className="h-px flex-1 bg-gradient-to-l from-transparent to-gray-200" />
+                </div>
+
+                {/* Timeline Items */}
+                <div className="mt-4">
+                  {group.items.map((fb, index) => (
+                    <TimelineItem
+                      key={fb.id}
+                      title={fb.student.name}
+                      subtitle={`${fb.teacher.name} 선생님`}
+                      content={fb.content}
+                      videoUrl={fb.video_url}
+                      badge={fb.video_url ? '영상' : undefined}
+                      defaultExpanded={groupIndex === 0 && index === 0}
+                    />
+                  ))}
+                </div>
               </motion.div>
             ))}
           </div>

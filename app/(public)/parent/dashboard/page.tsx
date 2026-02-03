@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { GlassCard, Button } from '@/components/ui'
+import { GlassCard, Button, SectionHeader, StatCard } from '@/components/ui'
 
 interface Child {
   id: string
@@ -20,35 +20,62 @@ interface Child {
   }>
 }
 
+interface LatestFeedback {
+  id: string
+  month_year: string
+  content: string
+  student: { name: string }
+  teacher: { name: string }
+}
+
 const dayNames = ['일', '월', '화', '수', '목', '금', '토']
 
 export default function ParentDashboardPage() {
   const router = useRouter()
   const [children, setChildren] = useState<Child[]>([])
+  const [latestFeedback, setLatestFeedback] = useState<LatestFeedback | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchChildren = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch('/api/parent/children')
-        const data = await res.json()
+        // Fetch children and latest feedback in parallel
+        const [childrenRes, feedbackRes] = await Promise.all([
+          fetch('/api/parent/children'),
+          fetch('/api/parent/feedback?limit=1')
+        ])
 
-        if (data.success) {
-          setChildren(data.data.children)
+        const childrenData = await childrenRes.json()
+        const feedbackData = await feedbackRes.json()
+
+        if (childrenData.success) {
+          setChildren(childrenData.data.children)
         } else {
-          if (res.status === 401) {
+          if (childrenRes.status === 401) {
             router.push('/parent/login')
           }
         }
+
+        if (feedbackData.success && feedbackData.data.feedback.length > 0) {
+          setLatestFeedback(feedbackData.data.feedback[0])
+        }
       } catch (error) {
-        console.error('Failed to fetch children:', error)
+        console.error('Failed to fetch data:', error)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchChildren()
+    fetchData()
   }, [router])
+
+  // Get first child with video URL for hero section
+  const childWithVideo = children.find(c => c.video_folder_url)
+
+  const formatMonthYear = (monthYear: string) => {
+    const [year, month] = monthYear.split('-')
+    return `${year}년 ${parseInt(month)}월`
+  }
 
   const handleLogout = async () => {
     document.cookie = 'parent_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT'
@@ -68,6 +95,85 @@ export default function ParentDashboardPage() {
             로그아웃
           </Button>
         </div>
+
+        {/* Video Hero Section */}
+        {!loading && childWithVideo && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <a
+              href={childWithVideo.video_folder_url!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block mb-6"
+            >
+              <GlassCard className="overflow-hidden p-0 hover:shadow-lg transition-shadow">
+                <div className="relative h-40 bg-gradient-to-r from-red-400 via-orange-400 to-yellow-300">
+                  <div className="absolute inset-0 bg-black/10" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                      <svg className="w-8 h-8 text-red-500 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/50 to-transparent">
+                    <span className="inline-block px-3 py-1 bg-white/90 rounded-full text-xs font-medium text-gray-700 mb-2">
+                      매월 첫째 주 업데이트
+                    </span>
+                    <h2 className="text-xl font-bold text-white">이번 달 연주 영상</h2>
+                    <p className="text-white/80 text-sm">우리 아이의 성장을 확인해보세요</p>
+                  </div>
+                </div>
+              </GlassCard>
+            </a>
+          </motion.div>
+        )}
+
+        {/* Latest Feedback Preview */}
+        {!loading && latestFeedback && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-6"
+          >
+            <SectionHeader
+              title="최신 피드백"
+              subtitle="선생님의 수업 평가"
+              action={
+                <Link href="/parent/feedback" className="text-sm text-primary font-medium">
+                  전체 보기
+                </Link>
+              }
+            />
+            <Link href={`/parent/feedback?student=${children[0]?.id}`}>
+              <GlassCard className="p-4 hover:bg-white/60 transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs">
+                    {latestFeedback.student.name}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {formatMonthYear(latestFeedback.month_year)}
+                  </span>
+                </div>
+                <p className="text-gray-700 text-sm line-clamp-2">{latestFeedback.content}</p>
+                <p className="text-xs text-gray-400 mt-2">{latestFeedback.teacher.name} 선생님</p>
+              </GlassCard>
+            </Link>
+          </motion.div>
+        )}
+
+        {/* Children Section */}
+        {!loading && children.length > 0 && (
+          <SectionHeader
+            title="내 자녀"
+            subtitle={`${children.length}명의 자녀가 등록되어 있습니다`}
+            className="mt-6"
+          />
+        )}
 
         {/* Children Cards */}
         {loading ? (
