@@ -53,14 +53,10 @@ import { logger } from './utils/logger'
 
 // Notion 피드백 데이터 구조 (MCP 조회 결과)
 interface NotionFeedbackEntry {
-  studentNotionPageId: string  // 원생의 Notion 페이지 ID
-  studentName: string          // 참조용 원생 이름
-  feedbacks: Array<{
-    date: string              // "2025-01" 또는 "2025-01-15" 형식
-    progress: string          // 진도 내용
-    feedback: string          // 피드백 내용
-    videoUrl?: string         // 영상 링크 (선택)
-  }>
+  pageId: string              // 피드백 페이지 ID
+  title: string               // "25년 4월", "24년 12월" 등
+  studentName: string         // 학생 이름 (ancestor-3-page에서 추출)
+  content: string             // 진도 + 피드백 내용
 }
 
 // CLI 인자 파싱
@@ -107,48 +103,48 @@ function loadNotionData(filename: string): NotionFeedbackEntry[] {
 }
 
 /**
- * 날짜 문자열을 month_year 형식으로 변환
- * "2025-01-15" → "2025-01"
- * "2025-01" → "2025-01"
- * "January 2025" → "2025-01"
+ * 제목에서 month_year 형식으로 변환
+ * "25년 4월" → "2025-04"
+ * "24년 12월" → "2024-12"
+ * "2025년 1월" → "2025-01"
  */
-function normalizeMonthYear(dateStr: string): string | null {
-  if (!dateStr) return null
+function normalizeMonthYear(title: string): string | null {
+  if (!title) return null
+
+  // 한글 형식: "25년 4월" 또는 "2025년 1월"
+  const korMatch = title.match(/(\d{2,4})년\s*(\d{1,2})월?/)
+  if (korMatch) {
+    let year = parseInt(korMatch[1], 10)
+    const month = parseInt(korMatch[2], 10)
+
+    // 2자리 연도는 2000년대로 변환
+    if (year < 100) {
+      year = 2000 + year
+    }
+
+    // 유효성 검사
+    if (month < 1 || month > 12) return null
+    if (year < 2020 || year > 2030) return null
+
+    return `${year}-${month.toString().padStart(2, '0')}`
+  }
 
   // YYYY-MM 또는 YYYY-MM-DD 형식
-  const isoMatch = dateStr.match(/^(\d{4})-(\d{2})/)
+  const isoMatch = title.match(/^(\d{4})-(\d{2})/)
   if (isoMatch) {
     return `${isoMatch[1]}-${isoMatch[2]}`
-  }
-
-  // 한글 형식: "2025년 1월"
-  const korMatch = dateStr.match(/(\d{4})년\s*(\d{1,2})월/)
-  if (korMatch) {
-    return `${korMatch[1]}-${korMatch[2].padStart(2, '0')}`
-  }
-
-  // 영문 형식: "January 2025"
-  const months: Record<string, string> = {
-    'january': '01', 'february': '02', 'march': '03', 'april': '04',
-    'may': '05', 'june': '06', 'july': '07', 'august': '08',
-    'september': '09', 'october': '10', 'november': '11', 'december': '12'
-  }
-  const engMatch = dateStr.toLowerCase().match(/(\w+)\s+(\d{4})/)
-  if (engMatch && months[engMatch[1]]) {
-    return `${engMatch[2]}-${months[engMatch[1]]}`
   }
 
   return null
 }
 
 /**
- * Notion 페이지 ID로 Supabase 학생 ID 조회
+ * 학생 이름으로 Supabase 학생 ID 조회
  */
-async function getStudentIdMap(supabase: ReturnType<typeof createAdminClient>) {
+async function getStudentNameMap(supabase: ReturnType<typeof createAdminClient>) {
   const { data, error } = await supabase
     .from('students')
-    .select('id, notion_page_id')
-    .not('notion_page_id', 'is', null)
+    .select('id, name')
 
   if (error) {
     logger.error('학생 데이터 조회 실패', error)
@@ -157,12 +153,15 @@ async function getStudentIdMap(supabase: ReturnType<typeof createAdminClient>) {
 
   const map = new Map<string, string>()
   data?.forEach(s => {
-    if (s.notion_page_id) {
-      map.set(s.notion_page_id, s.id)
+    if (s.name) {
+      // 이름에서 학년 정보 제거하고 매핑 (예: "김나은(3)" → "김나은")
+      const nameOnly = s.name.replace(/\(\d+\)$/, '').trim()
+      map.set(nameOnly, s.id)
+      map.set(s.name, s.id)  // 원본도 저장
     }
   })
 
-  logger.info(`Notion 연동 학생 ${map.size}명 로드됨`)
+  logger.info(`학생 ${data?.length || 0}명 로드됨 (이름 매핑: ${map.size}개)`)
   return map
 }
 
@@ -187,21 +186,27 @@ async function getDefaultTeacherId(supabase: ReturnType<typeof createAdminClient
 
 /**
  * 기존 피드백 조회 (중복 체크용)
+ * student_id + month_year 조합으로 Set 생성
  */
 async function getExistingFeedback(
-  supabase: ReturnType<typeof createAdminClient>,
-  studentId: string
+  supabase: ReturnType<typeof createAdminClient>
 ): Promise<Set<string>> {
   const { data, error } = await supabase
     .from('feedback')
-    .select('month_year')
-    .eq('student_id', studentId)
+    .select('student_id, month_year')
 
   if (error) {
+    logger.error('기존 피드백 조회 실패', error)
     return new Set()
   }
 
-  return new Set(data?.map(f => f.month_year) || [])
+  const existingSet = new Set<string>()
+  data?.forEach(f => {
+    existingSet.add(`${f.student_id}:${f.month_year}`)
+  })
+
+  logger.info(`기존 피드백 ${data?.length || 0}개 로드됨`)
+  return existingSet
 }
 
 /**
@@ -225,10 +230,10 @@ async function main() {
   const supabase = createAdminClient()
   logger.success('Supabase 연결 완료')
 
-  // 1. 학생 ID 매핑 로드
-  const studentIdMap = await getStudentIdMap(supabase)
-  if (studentIdMap.size === 0) {
-    logger.error('Notion과 연동된 학생이 없습니다. 먼저 migrate-notion-students.ts를 실행하세요.')
+  // 1. 학생 이름 → ID 매핑 로드
+  const studentNameMap = await getStudentNameMap(supabase)
+  if (studentNameMap.size === 0) {
+    logger.error('학생 데이터가 없습니다. 먼저 migrate-notion-students.ts를 실행하세요.')
     process.exit(1)
   }
 
@@ -238,104 +243,103 @@ async function main() {
     logger.error('등록된 선생님이 없습니다. 선생님을 먼저 등록하세요.')
     process.exit(1)
   }
+  logger.info(`기본 선생님 ID: ${defaultTeacherId}`)
 
-  // 3. Notion 피드백 데이터 로드
+  // 3. 기존 피드백 조회 (중복 체크용)
+  const existingFeedback = await getExistingFeedback(supabase)
+
+  // 4. Notion 피드백 데이터 로드
   const notionData = loadNotionData(options.inputFile)
-  logger.info(`Notion 피드백 데이터 ${notionData.length}명분 로드됨`)
+  logger.info(`Notion 피드백 데이터 ${notionData.length}건 로드됨`)
 
   // 통계
   const stats = {
-    studentsProcessed: 0,
-    feedbackCreated: 0,
-    feedbackSkipped: 0,
+    processed: 0,
+    created: 0,
+    skipped: 0,
+    noStudent: 0,
+    duplicate: 0,
     failed: 0,
   }
 
-  // 4. 각 학생별 피드백 처리
+  // 5. 각 피드백 항목 처리
   for (const entry of notionData) {
-    stats.studentsProcessed++
+    stats.processed++
 
-    // Notion 페이지 ID로 Supabase 학생 ID 조회
-    const studentId = studentIdMap.get(entry.studentNotionPageId)
-
-    if (!studentId) {
-      logger.warn(`학생 매핑 실패: ${entry.studentName} (pageId: ${entry.studentNotionPageId})`)
+    // month_year 파싱
+    const monthYear = normalizeMonthYear(entry.title)
+    if (!monthYear) {
+      logger.warn(`월/년 파싱 실패: ${entry.title}`)
       stats.failed++
       continue
     }
 
-    // 기존 피드백 조회 (중복 체크)
-    const existingMonths = await getExistingFeedback(supabase, studentId)
+    // 학생 이름으로 ID 찾기
+    const studentName = entry.studentName.replace(/\(\d+\)$/, '').trim()
+    const studentId = studentNameMap.get(studentName)
+    if (!studentId) {
+      logger.warn(`학생 찾기 실패: ${entry.studentName}`)
+      stats.noStudent++
+      continue
+    }
 
-    for (const fb of entry.feedbacks) {
-      const monthYear = normalizeMonthYear(fb.date)
+    // 중복 체크
+    const feedbackKey = `${studentId}:${monthYear}`
+    if (existingFeedback.has(feedbackKey)) {
+      logger.info(`중복 스킵: ${entry.studentName} - ${monthYear}`)
+      stats.duplicate++
+      continue
+    }
 
-      if (!monthYear) {
-        logger.warn(`날짜 파싱 실패: ${fb.date} (${entry.studentName})`)
-        stats.failed++
-        continue
-      }
+    // 내용 확인
+    const content = entry.content?.trim()
+    if (!content || content.length < 10) {
+      logger.warn(`내용 부족: ${entry.studentName} - ${monthYear}`)
+      stats.skipped++
+      continue
+    }
 
-      // 중복 체크
-      if (existingMonths.has(monthYear)) {
-        logger.debug(`피드백 스킵 (이미 존재): ${entry.studentName} ${monthYear}`)
-        stats.feedbackSkipped++
-        continue
-      }
+    const feedbackData = {
+      student_id: studentId,
+      teacher_id: defaultTeacherId,
+      month_year: monthYear,
+      content: content,
+      is_published: true,
+      published_at: new Date().toISOString(),
+    }
 
-      // 피드백 내용 합성
-      const content = [fb.progress, fb.feedback]
-        .filter(Boolean)
-        .join('\n\n')
+    if (options.dryRun) {
+      logger.info(`[DRY-RUN] 피드백 생성: ${entry.studentName} - ${monthYear}`)
+      console.log(`  내용: ${content.substring(0, 60)}...`)
+      stats.created++
+      existingFeedback.add(feedbackKey)
+      continue
+    }
 
-      if (!content) {
-        logger.debug(`피드백 스킵 (내용 없음): ${entry.studentName} ${monthYear}`)
-        stats.feedbackSkipped++
-        continue
-      }
+    // 피드백 생성
+    const { error } = await supabase
+      .from('feedback')
+      .insert(feedbackData)
 
-      const feedbackData = {
-        student_id: studentId,
-        teacher_id: defaultTeacherId,
-        month_year: monthYear,
-        content: content,
-        video_url: fb.videoUrl || null,
-        is_published: true,  // 기존 데이터는 이미 공유됨
-        published_at: new Date().toISOString(),
-      }
-
-      if (options.dryRun) {
-        logger.info(`[DRY-RUN] 피드백 생성: ${entry.studentName} ${monthYear}`, {
-          hasVideo: !!fb.videoUrl,
-          contentLength: content.length,
-        })
-        stats.feedbackCreated++
-        existingMonths.add(monthYear)
-        continue
-      }
-
-      const { error } = await supabase
-        .from('feedback')
-        .insert(feedbackData)
-
-      if (error) {
-        logger.error(`피드백 생성 실패: ${entry.studentName} ${monthYear}`, error)
-        stats.failed++
-      } else {
-        logger.success(`피드백 생성: ${entry.studentName} ${monthYear}`)
-        stats.feedbackCreated++
-        existingMonths.add(monthYear)
-      }
+    if (error) {
+      logger.error(`피드백 생성 실패: ${entry.studentName} - ${monthYear}`, error)
+      stats.failed++
+    } else {
+      logger.success(`피드백 생성: ${entry.studentName} - ${monthYear}`)
+      stats.created++
+      existingFeedback.add(feedbackKey)
     }
   }
 
   // 결과 요약
   console.log('\n' + '='.repeat(50))
-  console.log('마이그레이션 결과')
+  console.log('피드백 마이그레이션 결과')
   console.log('='.repeat(50))
-  console.log(`  처리 학생: ${stats.studentsProcessed}명`)
-  console.log(`  피드백 생성: ${stats.feedbackCreated}건`)
-  console.log(`  피드백 스킵: ${stats.feedbackSkipped}건`)
+  console.log(`  처리: ${stats.processed}건`)
+  console.log(`  생성: ${stats.created}건`)
+  console.log(`  중복 스킵: ${stats.duplicate}건`)
+  console.log(`  학생 없음: ${stats.noStudent}건`)
+  console.log(`  스킵: ${stats.skipped}건`)
   console.log(`  실패: ${stats.failed}건`)
   console.log('='.repeat(50))
 
