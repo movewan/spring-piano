@@ -32,7 +32,10 @@ export default function FeedbackPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
   const [loading, setLoading] = useState(true)
 
-  // 모달 상태
+  // 상세보기 모달 상태
+  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null)
+
+  // 추가 모달 상태
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [students, setStudents] = useState<Student[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
@@ -185,7 +188,10 @@ export default function FeedbackPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <GlassCard className="p-6">
+                <GlassCard
+                  className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
+                  onClick={() => setSelectedFeedback(fb)}
+                >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -200,9 +206,18 @@ export default function FeedbackPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {fb.video_url && (
-                        <span className="px-2 py-1 bg-secondary/10 text-secondary rounded-full text-xs">
-                          영상
-                        </span>
+                        <a
+                          href={fb.video_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs hover:bg-red-200 transition-colors inline-flex items-center gap-1"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                          영상 보기
+                        </a>
                       )}
                       <span
                         className={`px-2 py-1 rounded-full text-xs ${
@@ -222,9 +237,22 @@ export default function FeedbackPage() {
                     <Button
                       variant={fb.is_published ? 'outline' : 'primary'}
                       size="sm"
-                      onClick={() => handlePublish(fb.id, fb.is_published)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handlePublish(fb.id, fb.is_published)
+                      }}
                     >
                       {fb.is_published ? '비공개로 전환' : '공개하기'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedFeedback(fb)
+                      }}
+                    >
+                      상세보기
                     </Button>
                   </div>
                 </GlassCard>
@@ -233,6 +261,90 @@ export default function FeedbackPage() {
           </div>
         )}
       </div>
+
+      {/* Feedback Detail Modal */}
+      <Modal
+        isOpen={!!selectedFeedback}
+        onClose={() => setSelectedFeedback(null)}
+        title="피드백 상세"
+        size="lg"
+      >
+        {selectedFeedback && (
+          <div className="space-y-6">
+            {/* 원생 정보 */}
+            <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-primary font-bold text-2xl">
+                  {selectedFeedback.student.name.charAt(0)}
+                </span>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{selectedFeedback.student.name}</h3>
+                <p className="text-gray-500">{selectedFeedback.teacher.name} 선생님</p>
+                <p className="text-sm text-gray-400">{formatMonthYear(selectedFeedback.month_year)}</p>
+              </div>
+              <div className="ml-auto">
+                <span
+                  className={`px-3 py-1 rounded-full text-sm ${
+                    selectedFeedback.is_published
+                      ? 'bg-green-100 text-green-600'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {selectedFeedback.is_published ? '공개됨' : '미공개'}
+                </span>
+              </div>
+            </div>
+
+            {/* 피드백 내용 */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-500 mb-2">피드백 내용</h4>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  {selectedFeedback.content}
+                </p>
+              </div>
+            </div>
+
+            {/* 영상 링크 */}
+            {selectedFeedback.video_url && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-500 mb-2">영상 링크</h4>
+                <a
+                  href={selectedFeedback.video_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  <span className="font-medium">영상 보기</span>
+                  <span className="text-red-400 text-sm truncate max-w-[200px]">
+                    {selectedFeedback.video_url}
+                  </span>
+                </a>
+              </div>
+            )}
+
+            {/* 액션 버튼 */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <Button
+                variant={selectedFeedback.is_published ? 'outline' : 'primary'}
+                onClick={() => {
+                  handlePublish(selectedFeedback.id, selectedFeedback.is_published)
+                  setSelectedFeedback(null)
+                }}
+              >
+                {selectedFeedback.is_published ? '비공개로 전환' : '공개하기'}
+              </Button>
+              <Button variant="ghost" onClick={() => setSelectedFeedback(null)}>
+                닫기
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Add Feedback Modal */}
       <Modal

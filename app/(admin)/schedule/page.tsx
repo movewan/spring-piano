@@ -95,6 +95,9 @@ export default function SchedulePage() {
   const weekDays = getWeekDays(currentWeek)
   const today = new Date()
 
+  // weekStart를 문자열로 변환하여 안정적인 의존성 생성
+  const weekStartStr = formatDateISO(weekStart)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
@@ -116,7 +119,6 @@ export default function SchedulePage() {
       }
 
       // 주간 스냅샷 조회
-      const weekStartStr = formatDateISO(weekStart)
       const weeklyRes = await fetch(`/api/schedules/weekly?week_start=${weekStartStr}`)
       const weeklyData = await weeklyRes.json()
       if (weeklyData.success && weeklyData.data.snapshot) {
@@ -129,7 +131,7 @@ export default function SchedulePage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedDay, viewMode, weekStart])
+  }, [selectedDay, viewMode, weekStartStr])
 
   useEffect(() => {
     fetchData()
@@ -226,7 +228,6 @@ export default function SchedulePage() {
   }
 
   const handleConfirmWeek = async () => {
-    const weekStartStr = formatDateISO(weekStart)
     const weekEndStr = formatDateISO(weekDays[6])
 
     try {
@@ -251,7 +252,6 @@ export default function SchedulePage() {
   }
 
   const handleCopyLastWeek = async () => {
-    const weekStartStr = formatDateISO(weekStart)
     const weekEndStr = formatDateISO(weekDays[6])
 
     try {
